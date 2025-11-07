@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Game PAI - Rukun Iman Kelas 1 (Responsive)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/addons/p5.sound.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #eee; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+let player, blocks = [];
+let score=0, lives=3;
+let showMenu=true, showModal=false, gameOver=false;
+let active=null, feedback="";
+let restartBtn, exitBtn;
+let timer = 15, timerStart = 15, lastTick=0;
+
+let sndJump, sndCorrect, sndWrong, sndClick;
+
+let questions = [
+  {q:"Rukun iman ada ...", opts:["A. 5","B. 6","C. 7","D. 8"], ans:"B"},
+  {q:"Rukun iman pertama adalah iman kepada ...", opts:["A. Malaikat","B. Allah","C. Kitab","D. Nabi"], ans:"B"},
+  {q:"Allah itu hanya satu, disebut ...", opts:["A. Dua","B. Banyak","C. Esa","D. Tidak tahu"], ans:"C"},
+  {q:"Malaikat diciptakan oleh Allah dari ...", opts:["A. Api","B. Tanah","C. Cahaya","D. Air"], ans:"C"},
+  {q:"Rukun iman kedua adalah iman kepada ...", opts:["A. Malaikat","B. Hewan","C. Tumbuhan","D. Bintang"], ans:"A"},
+  {q:"Kitab suci umat Islam adalah ...", opts:["A. Injil","B. Weda","C. Al-Qur'an","D. Tripitaka"], ans:"C"},
+  {q:"Rukun iman ketiga adalah iman kepada ...", opts:["A. Kitab-kitab Allah","B. Buku sekolah","C. Majalah","D. Surat undangan"], ans:"A"},
+  {q:"Rukun iman keempat adalah iman kepada ...", opts:["A. Orang tua","B. Rasul-rasul Allah","C. Teman","D. Guru"], ans:"B"},
+  {q:"Rasul terakhir adalah Nabi ...", opts:["A. Musa","B. Isa","C. Ibrahim","D. Muhammad"], ans:"D"},
+  {q:"Rukun iman kelima adalah iman kepada ...", opts:["A. Hari kiamat","B. Hari senin","C. Hari ulang tahun","D. Hari libur"], ans:"A"},
+  {q:"Hari kiamat pasti akan ...", opts:["A. Terjadi","B. Mungkin tidak","C. Hanya cerita","D. Tidak akan terjadi"], ans:"A"},
+  {q:"Rukun iman keenam adalah iman kepada ...", opts:["A. Nasib dan keberuntungan","B. Qada dan Qadar","C. Angka keberuntungan","D. Hari libur"], ans:"B"}
+];
+
+function preload(){
+  sndJump = new p5.Oscillator('triangle');
+  sndCorrect = new p5.Oscillator('sine');
+  sndWrong = new p5.Oscillator('square');
+  sndClick = new p5.Oscillator('sine');
+}
+
+function setup(){
+  createCanvas(windowWidth, windowHeight);
+  textFont('Arial');
+  initGame();
+}
+
+function windowResized(){
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+function initGame(){
+  shuffleArray(questions);
+  player=new Player();
+  blocks=[];
+  for(let i=0;i<questions.length;i++){
+    blocks.push(new Block(random(80, width-140), random(120, height/2), i));
+  }
+  score=0; lives=3;
+  showMenu=true; showModal=false; gameOver=false;
+  active=null; feedback="";
+  timer=timerStart;
+  loop();
+}
+
+function draw(){
+  background(135,206,235);
+  fill(80,50,20);
+  rect(0,height-80,width,80);
+  if(showMenu){ drawMenu(); return; }
+
+  if(!showModal && !gameOver){
+    player.handle();
+    player.update();
+  }
+  player.draw();
+  for(let b of blocks){
+    b.draw();
+    if(!b.done && !showModal && player.rectOverlap(b.rect)){
+      if(player.vy<0){ ask(b); }
+    }
+  }
+  fill(0); textSize(18); text("Score: "+score+" / "+questions.length+"   Nyawa: "+lives,10,20);
+  if(showModal && active) drawModal();
+  if(lives<=0){ gameOver=true; }
+  if(gameOver){ drawGameOver(); noLoop(); }
+}
+
+function drawMenu(){
+  fill(0);
+  textSize(28); textAlign(CENTER);
+  text("Game PAI - Rukun Iman (Kelas 1)",width/2,100);
+  textSize(18);
+  text("Tekan ENTER untuk mulai",width/2,330);
+}
+
+class Player{
+  constructor(){
+    this.w=width*0.05; this.h=height*0.08;
+    this.x=50; this.y=height-80-this.h;
+    this.vx=0; this.vy=0;
+    this.speed=5; this.jump=-13;
+    this.onGround=false;
+  }
+  handle(){
+    this.vx=0;
+    if(keyIsDown(65)||keyIsDown(37)) this.vx=-this.speed;
+    if(keyIsDown(68)||keyIsDown(39)) this.vx=this.speed;
+    if((keyIsDown(32)||keyIsDown(87)||keyIsDown(38)) && this.onGround){
+      this.vy=this.jump; this.onGround=false; playJump();
+    }
+  }
+  update(){
+    this.vy+=0.8;
+    this.x+=this.vx;
+    this.y+=this.vy;
+    if(this.x<0) this.x=0;
+    if(this.x+this.w>width) this.x=width-this.w;
+    if(this.y+this.h>height-80){ this.y=height-80-this.h; this.vy=0; this.onGround=true; }
+  }
+  draw(){ fill(220,50,50); rect(this.x,this.y,this.w,this.h,6); }
+  rectOverlap(r){ return (this.x < r.x+r.w && this.x+this.w > r.x && this.y < r.y+r.h && this.y+this.h > r.y); }
+}
+
+class Block{
+  constructor(x,y,i){ this.x=x; this.y=y; this.w=width*0.05; this.h=width*0.05; this.index=i; this.done=false; }
+  draw(){
+    fill(this.done ? color(80,200,80) : color(200,170,50));
+    rect(this.x,this.y,this.w,this.h,8);
+    fill(0); textSize(24); textAlign(CENTER,CENTER); text("?",this.x+this.w/2,this.y+this.h/2);
+  }
+  get rect(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
+}
+
+function ask(block){ active=block; showModal=true; feedback=""; timer=timerStart; }
+
+function drawModal(){
+  fill(0,150); rect(0,0,width,height);
+  fill(255); rect(width*0.1,height*0.1,width*0.8,height*0.6,15);
+  fill(0);
+  let q = questions[active.index];
+  fill(255,80,80); rect(width-160,80,40,40,10);
+  fill(255); textSize(26); text("X", width-140, 110);
+  fill(150,150,255); rect(width-240,80,60,40,10);
+  fill(0); textSize(16); text("Lewati", width-210,105);
+  fill(0); textSize(22); text(q.q,120,140,width-240,120);
+  textSize(18);
+  for(let i=0;i<q.opts.length;i++){ text(q.opts[i],120,240+i*30); }
+  fill(200,0,0); if(feedback!=="") text(feedback,120,370);
+  fill(0); textSize(20); text("Waktu: " + timer + " detik", width-300, 370);
+  if(millis()-lastTick > 1000){ timer--; lastTick = millis(); if(timer<=0){ lives--; feedback="Waktu habis!"; showModal=false; active=null; } }
+}
+
+function keyPressed(){
+  if(showMenu && keyCode===ENTER){ showMenu=false; return; }
+  if(showModal && active && ["A","B","C","D"].includes(key)) checkAnswer(key);
+}
+
+function checkAnswer(k){
+  let q = questions[active.index];
+  if(k===q.ans){ active.done=true; score++; playCorrect(); showModal=false; active=null; }
+  else{ lives--; feedback="Salah!"; playWrong(); if(lives<=0){ showModal=false; active=null; } }
+}
+
+function mousePressed(){
+  if(showModal){
+    if(mouseX>width-160 && mouseX<width-120 && mouseY>80 && mouseY<120){
+      sndClick.start(); sndClick.freq(600); sndClick.stop(0.2);
+      showModal=false; active=null; return;
+    }
+    if(mouseX>width-240 && mouseX<width-180 && mouseY>80 && mouseY<120){
+      sndClick.start(); sndClick.freq(500); sndClick.stop(0.2);
+      active.done=true; showModal=false; active=null; return;
+    }
+  }
+  if(gameOver){
+    if(mouseX>restartBtn.x && mouseX<restartBtn.x+restartBtn.w && mouseY>restartBtn.y && mouseY<restartBtn.y+restartBtn.h){ initGame(); }
+    if(mouseX>exitBtn.x && mouseX<exitBtn.x+exitBtn.w && mouseY>exitBtn.y && mouseY<exitBtn.y+exitBtn.h){ showMenu=true; gameOver=false; loop(); }
+  }
+}
+
+function drawGameOver(){
+  fill(0,150); rect(0,0,width,height);
+  fill(255); rect(width/2-200,height/2-180,400,320,20);
+  fill(0); textSize(36); textAlign(CENTER);
+  text("GAME OVER",width/2,height/2-110);
+  textSize(20); text("Skor Akhir: "+score, width/2, height/2-60);
+  restartBtn = {x:width/2-160,y:height/2,width:140,h:50};
+  exitBtn = {x:width/2+20,y:height/2,width:140,h:50};
+  fill(100,200,100); rect(restartBtn.x,restartBtn.y,restartBtn.w,restartBtn.h,12);
+  fill(0); text("Restart",restartBtn.x+restartBtn.w/2,restartBtn.y+33);
+  fill(200,100,100); rect(exitBtn.x,exitBtn.y,exitBtn.w,exitBtn.h,12);
+  fill(255); text("Keluar",exitBtn.x+exitBtn.w/2,exitBtn.y+33);
+}
+
+function playJump(){ sndJump.start(); sndJump.freq(300); sndJump.stop(0.1); }
+function playCorrect(){ sndCorrect.start(); sndCorrect.freq(900); sndCorrect.stop(0.2); }
+function playWrong(){ sndWrong.start(); sndWrong.freq(120); sndWrong.stop(0.2); }
+
+function shuffleArray(a){ for(let i=a.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+</script>
+</body>
+</html>
